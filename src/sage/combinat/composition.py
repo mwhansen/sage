@@ -362,7 +362,9 @@ class Composition(CombinatorialElement):
             sage: Composition([]) + Composition([]) == Composition([])
             True
         """
-        return Compositions()(list(self) + list(other))
+        if isinstance(other, Composition):
+            return _Compositions.from_parts(self._list + other._list)
+        return _Compositions(list(self) + list(other))
 
     def size(self) -> int:
         """
@@ -1948,6 +1950,106 @@ class Compositions_all(Compositions):
         """
         cat = AdditiveMonoids()
         Compositions.__init__(self, True, category=cat)
+        # Interned elements, keyed by their tuple of parts.  A strong
+        # cache is essential: the payoff is hits on keys of intermediate
+        # results that are themselves discarded, which weak references
+        # would drop immediately.  Bounded to keep long sessions from
+        # accumulating arbitrarily many compositions; cleared wholesale
+        # on overflow and rewarmed by subsequent computations.
+        self._intern_cache = {}
+        self._intern_cache_maxsize = 200000
+
+    def _element_constructor_(self, lst) -> Composition:
+        """
+        Construct an element with ``self`` as parent.
+
+        Elements are interned: constructing a composition from the same
+        parts twice returns the same object, so repeated construction
+        (ubiquitous in quasisymmetric function computations) costs a
+        dictionary lookup instead of validation and allocation.
+
+        EXAMPLES::
+
+            sage: C = Compositions()
+            sage: c = C([3,1,2]); c
+            [3, 1, 2]
+            sage: C(c) is c
+            True
+            sage: C([3,1,2]) is c
+            True
+            sage: C(Compositions(6)([3,1,2])) is c
+            True
+
+        Zero parts are significant, so no two of these coincide::
+
+            sage: C([1,2]), C([1,0,2]), C([1,2,0])
+            ([1, 2], [1, 0, 2], [1, 2, 0])
+
+        TESTS::
+
+            sage: C([3,-1,1])
+            Traceback (most recent call last):
+            ...
+            ValueError: not a composition
+            sage: C("strawberry")
+            Traceback (most recent call last):
+            ...
+            ValueError: not a composition
+        """
+        if isinstance(lst, Composition):
+            key = tuple(lst._list)
+        elif isinstance(lst, (list, tuple)) and all(
+            isinstance(x, (int, Integer)) for x in lst
+        ):
+            # the entry type check keeps the fast path exactly as strict
+            # as the validation below (e.g. floats must not be accepted,
+            # so a value-equality cache hit alone is not enough)
+            key = tuple(lst)
+        else:
+            key = None
+        if key is not None:
+            elt = self._intern_cache.get(key)
+            if elt is not None:
+                return elt
+        elt = super()._element_constructor_(lst)
+        if key is not None:
+            if len(self._intern_cache) >= self._intern_cache_maxsize:
+                self._intern_cache.clear()
+            self._intern_cache[tuple(elt._list)] = elt
+        return elt
+
+    def from_parts(self, parts):
+        r"""
+        Return the composition with parts ``parts``.
+
+        INPUT:
+
+        - ``parts`` -- a sequence of nonnegative integers
+
+        Like :meth:`_element_constructor_`, this interns the result, so
+        constructing the same composition repeatedly is a dictionary
+        lookup.  Unlike it, this skips the parent's validation on a
+        cache miss, so it is suited to converting the output of a
+        trusted kernel.
+
+        EXAMPLES::
+
+            sage: C = Compositions()
+            sage: C.from_parts((3, 1, 2))
+            [3, 1, 2]
+            sage: C.from_parts((3, 1, 2)) is C([3, 1, 2])
+            True
+        """
+        key = tuple(parts)
+        try:
+            return self._intern_cache[key]
+        except KeyError:
+            pass
+        elt = self.element_class(self, list(key))
+        if len(self._intern_cache) >= self._intern_cache_maxsize:
+            self._intern_cache.clear()
+        self._intern_cache[key] = elt
+        return elt
 
     def _repr_(self) -> str:
         """
@@ -2170,5 +2272,7 @@ def composition_iterator_fast(n):
         else:
             cur.append(Integer(0))
 
+
+_Compositions = Compositions()
 
 register_unpickle_override('sage.combinat.composition', 'Composition_class', Composition)
