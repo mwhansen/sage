@@ -6643,6 +6643,109 @@ class Partitions_all(Partitions):
             sage: TestSuite(P).run()
         """
         Partitions.__init__(self, is_infinite=True)
+        # Interned elements, keyed by their tuple of parts.  A strong
+        # cache is essential: the payoff is hits on keys of intermediate
+        # results that are themselves discarded, which weak references
+        # would drop immediately.  Bounded to keep long sessions from
+        # accumulating arbitrarily many partitions; cleared wholesale on
+        # overflow and rewarmed by subsequent computations.
+        self._intern_cache = {}
+        self._intern_cache_maxsize = 200000
+
+    def _element_constructor_(self, lst):
+        """
+        Construct an element with ``self`` as parent.
+
+        Elements are interned: constructing a partition from the same
+        parts twice returns the same object, so repeated construction
+        (ubiquitous in symmetric function computations) costs a
+        dictionary lookup instead of validation and allocation.
+
+        EXAMPLES::
+
+            sage: P = Partitions()
+            sage: p = P([3,3,1]); p
+            [3, 3, 1]
+            sage: P(p) is p
+            True
+            sage: P([3,3,1]) is p
+            True
+            sage: P([3,3,1,0]) is p
+            True
+            sage: P(Partitions(7)([3,3,1])) is p
+            True
+
+        TESTS::
+
+            sage: P([3,2,4])
+            Traceback (most recent call last):
+            ...
+            ValueError: [3, 2, 4] is not an element of Partitions
+        """
+        if isinstance(lst, Partition):
+            key = tuple(lst._list)
+        elif isinstance(lst, (list, tuple)):
+            key = tuple(lst)
+            try:
+                # strip trailing zeros, but only genuine zeros: entries
+                # that are merely falsy (such as empty lists) must not
+                # match, so no truthiness shortcut here
+                while key and key[-1] == 0:
+                    key = key[:-1]
+            except (TypeError, ValueError):
+                key = None
+        else:
+            key = None
+        if key is not None:
+            try:
+                p = self._intern_cache.get(key)
+            except TypeError:
+                # unhashable entries; leave validation to the generic code
+                p = None
+            if p is not None:
+                return p
+        p = super()._element_constructor_(lst)
+        if key is not None:
+            if len(self._intern_cache) >= self._intern_cache_maxsize:
+                self._intern_cache.clear()
+            self._intern_cache[tuple(p._list)] = p
+        return p
+
+    def from_parts(self, parts):
+        r"""
+        Return the partition with parts ``parts``.
+
+        INPUT:
+
+        - ``parts`` -- a weakly decreasing sequence of positive integers
+
+        .. WARNING::
+
+            ``parts`` is not validated; use this only on data that is
+            already known to be a partition, such as the output of a
+            trusted library.
+
+        Like :meth:`_element_constructor_`, this interns the result, so
+        constructing the same partition repeatedly is a dictionary lookup.
+
+        EXAMPLES::
+
+            sage: P = Partitions()
+            sage: P.from_parts((5, 3, 3))
+            [5, 3, 3]
+            sage: P.from_parts((5, 3, 3)) is P([5, 3, 3])
+            True
+        """
+        key = tuple(parts)
+        try:
+            return self._intern_cache[key]
+        except KeyError:
+            pass
+        p = self.element_class(self, [ZZ(e) for e in key])
+        if len(self._intern_cache) >= self._intern_cache_maxsize:
+            self._intern_cache.clear()
+        self._intern_cache[key] = p
+        return p
 
     def subset(self, size=None, **kwargs):
         """

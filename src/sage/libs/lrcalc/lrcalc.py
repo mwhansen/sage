@@ -202,8 +202,8 @@ def _lrcalc_dict_to_sage(result) -> dict:
         sage: mult([2,1],[3,2,1],3) # indirect doctest
         {[3, 3, 3]: 1, [4, 3, 2]: 2, [4, 4, 1]: 1, [5, 2, 2]: 1, [5, 3, 1]: 1}
     """
-    return {_Partitions.element_class(_Partitions, [Integer(p) for p in la]):
-            Integer(k) for la, k in result.items()}
+    from_parts = _Partitions.from_parts
+    return {from_parts(la): Integer(k) for la, k in result.items()}
 
 
 def lrcoef_unsafe(outer, inner1, inner2):
@@ -405,10 +405,10 @@ def coprod(part, all=0) -> dict:
         [(([1, 1], [1]), 1), (([2], [1]), 1), (([2, 1], []), 1)]
     """
     result = lrcalc.coprod(part, all)
-    return {tuple([_Partitions.element_class(_Partitions,
-                                             [Integer(p) for p in mu])
-                   for mu in la]): Integer(k)
-            for la, k in result.items()}
+    from_parts = _Partitions.from_parts
+    return {
+        tuple([from_parts(mu) for mu in la]): Integer(k) for la, k in result.items()
+    }
 
 
 def mult_schubert(w1, w2, rank=0) -> dict:
