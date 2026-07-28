@@ -5041,7 +5041,9 @@ class Partition(CombinatorialElement):
         if k == 0:
             return []
 
-        L = self._list
+        # take a copy: this list gets a zero appended below, which must
+        # not leak into the partition itself
+        L = list(self._list)
         shelf = [k]  # the number of boxes which will fit in a row
         mapping = [0]  # a record of the rows
         for i in range(len(L)-1):
