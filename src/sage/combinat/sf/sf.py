@@ -498,12 +498,18 @@ class SymmetricFunctions(UniqueRepresentation, Parent):
         TypeError: no conversion of this rational to integer
 
     Because of this, some functions may not behave as expected when working over
-    the integers, even though they make mathematical sense::
+    the integers, even though they make mathematical sense.  Plethysm is one:
+    it preserves the integral lattice, but the route through the power sums
+    does not, so it needs the optional :ref:`symfn <spkg_symfn>` package -- which
+    does not take that route -- to answer over `\ZZ`::
 
-        sage: s[1,1,1].plethysm(s[1,1,1])
+        sage: s[1,1,1].plethysm(s[1,1,1])                                       # needs !symfn
         Traceback (most recent call last):
         ...
         TypeError: no conversion of this rational to integer
+        sage: s[1,1,1].plethysm(s[1,1,1])                                       # optional - symfn
+        s[1, 1, 1, 1, 1, 1, 1, 1, 1] + s[2, 2, 1, 1, 1, 1, 1] + s[2, 2, 2, 1, 1, 1]
+         + s[3, 2, 2, 2] + s[3, 3, 1, 1, 1]
 
     It is possible to work over different base rings simultaneously::
 

@@ -3547,6 +3547,23 @@ class SymmetricFunctionAlgebra_generic_Element(CombinatorialFreeModule.Element):
 
         degree_one = _variables_recursive(R, include=include, exclude=exclude)
 
+        # The kernel route, which is available only in the plainest case: no
+        # tensor factors, no degree-one variables to raise, and integral
+        # coefficients on both sides.  Everything the generic route below does
+        # beyond that -- raising variables, walking tensor factors -- has no
+        # counterpart on the far side of the boundary, so the guard is what
+        # keeps this from quietly answering a different question.
+        # The answer lands in ``Px``, the parent of ``x`` -- not in ``parent`` --
+        # which is what the generic route below returns and is not obvious:
+        # ``p[3](s[2,1])`` comes back in the Schur basis.
+        if not tensorflag and not degree_one and isinstance(x, SymmetricFunctionAlgebra_generic.Element):
+            from sage.libs.symfn import is_available
+            if is_available() and R.has_coerce_map_from(ZZ):
+                from sage.libs.symfn.backend import plethysm as symfn_plethysm
+                out = symfn_plethysm(self, x, Px)
+                if out is not None:
+                    return out
+
         if tensorflag:
             tparents = Px._sets
             lincomb = Px.linear_combination

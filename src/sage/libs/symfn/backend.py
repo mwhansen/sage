@@ -384,6 +384,59 @@ def reduced_kronecker_product(la, mu, ring):
             for nu, c in symfn.reduced_kronecker_product(list(la), list(mu))}
 
 
+def _integral_schur_terms(f):
+    r"""
+    Return ``f`` in the Schur basis as integer ``(partition, coefficient)``
+    pairs, or ``None`` if any coefficient is not an integer.
+
+    symfn's plethysm carries integer rows.  Plethysm preserves the integral
+    lattice -- the Schur functions are a `\ZZ`-basis and `f[g]` of two integral
+    elements is integral -- so refusing a rational input costs nothing that the
+    generic route cannot supply.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import _integral_schur_terms
+        sage: s = SymmetricFunctions(QQ).s()
+        sage: sorted(_integral_schur_terms(s[2] + 3*s[1, 1]))
+        [((1, 1), 3), ((2,), 1)]
+        sage: _integral_schur_terms(s[2] / 2) is None
+        True
+    """
+    from sage.combinat.sf.sf import SymmetricFunctions
+    schur = SymmetricFunctions(f.parent().base_ring()).schur()
+    rows = []
+    for mu, c in schur(f).monomial_coefficients().items():
+        if c not in ZZ:
+            return None
+        rows.append((tuple(mu), int(ZZ(c))))
+    return rows
+
+
+def plethysm(f, g, parent):
+    r"""
+    Return the plethysm `f[g]` as an element of ``parent``, or ``None`` if
+    either operand has a coefficient that is not an integer.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import plethysm
+        sage: Sym = SymmetricFunctions(QQ)
+        sage: h, s = Sym.h(), Sym.s()
+        sage: plethysm(h[2], h[2], s)
+        s[2, 2] + s[4]
+        sage: plethysm(s[2] / 2, s[2], s) is None
+        True
+    """
+    a, b = _integral_schur_terms(f), _integral_schur_terms(g)
+    if a is None or b is None:
+        return None
+    R = parent.base_ring()
+    schur = parent.realization_of().schur()
+    return parent(schur._from_dict({_Partitions.from_parts(mu): R(c)
+                                    for mu, c in symfn.plethysm(a, b)}))
+
+
 def induced_trivial_product(la, mu, ring):
     r"""
     Return `\tilde{h}_\lambda \tilde{h}_\mu` as a ``{Partition: coefficient}``
