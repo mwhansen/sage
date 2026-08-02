@@ -463,6 +463,141 @@ def hall_littlewood_p_caches(n, ring):
     return p_to_s, s_to_p
 
 
+def _jack_cell(cell, ring, alpha):
+    r"""
+    Return one Jack coefficient as an element of ``ring``.
+
+    symfn hands a coefficient over `\QQ(\alpha)` across as a triple
+    ``(numerator, denominator atoms, scale)``, meaning
+
+    .. MATH::
+
+        \frac{\sum_k \text{num}[k]\, \alpha^k}
+             {\text{scale} \cdot \prod (u\alpha + v)^{m}}.
+
+    The numerator is dense -- the index *is* the exponent -- and the denominator
+    arrives **factored**, because a caller rebuilding this in `\QQ(\alpha)`
+    wants the product and expanding here only to refactor there is work done
+    twice.  The atoms are primitive, so the factorization is canonical.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import _jack_cell
+        sage: R = QQ['t'].fraction_field()
+        sage: _jack_cell(([6], [(1, 2, 1)], 1), R, R.gen())
+        6/(t + 2)
+        sage: _jack_cell(([6], [(1, 1, 1), (2, 1, 1)], 1), R, R.gen())
+        3/(t^2 + 3/2*t + 1/2)
+    """
+    num, atoms, scale = cell
+    top = ring.sum(ring(c) * alpha**k for k, c in enumerate(num) if c)
+    bottom = ring(scale)
+    for u, v, mult in atoms:
+        bottom *= (ring(u) * alpha + ring(v))**int(mult)
+    return top / bottom
+
+
+def jack_p_table(n, ring):
+    r"""
+    Return the Jack `P` basis of degree ``n`` in the monomial basis, as
+    ``{Partition: {Partition: coefficient}}`` over ``ring``.
+
+    ``ring`` must contain the Jack parameter, which symfn calls `\alpha` and
+    Sage calls ``t``.
+
+    Sage builds this by Gram-Schmidt against the Jack scalar product, which is
+    what walls it at degree 12; symfn reaches it by the Laplace-Beltrami
+    eigenoperator recursion and enumerates no tableaux at all.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import jack_p_table
+        sage: QQt = QQ['t'].fraction_field()
+        sage: table = jack_p_table(3, QQt)
+        sage: sorted(table[Partition([3])].items())
+        [([1, 1, 1], 3/(t^2 + 3/2*t + 1/2)), ([2, 1], 3/2/(t + 1/2)), ([3], 1)]
+
+    It is the expansion Sage's own `P` basis gives::
+
+        sage: m = SymmetricFunctions(QQt).m()
+        sage: m(SymmetricFunctions(QQt).jack().P()[3])
+        (3/(t^2+3/2*t+1/2))*m[1, 1, 1] + (3/2/(t+1/2))*m[2, 1] + m[3]
+    """
+    alpha = ring.gen()
+    return {_Partitions.from_parts(la):
+            {_Partitions.from_parts(mu): _jack_cell((num, atoms, scale), ring, alpha)
+             for mu, num, atoms, scale in cells}
+            for la, cells in symfn.jack_table(int(n))}
+
+
+def _mac_cell(num, den, ring, base):
+    r"""
+    Return one Macdonald coefficient as an element of ``ring``.
+
+    symfn hands a coefficient over `\QQ(q,t)` across as a numerator's
+    ``(q_exp, t_exp, coefficient)`` terms and a denominator's
+    ``(q_exp, t_exp, multiplicity)`` **factors**, the latter meaning
+    `\prod (1 - q^a t^b)^m`.
+
+    The denominator arrives factored rather than expanded because that is the
+    representation, not an optimization: a caller rebuilding this in a fraction
+    field wants the product, and expanding here to refactor there is work done
+    twice.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import _mac_cell
+        sage: R = QQ['q','t'].fraction_field()
+        sage: _mac_cell([(0, 0, 1), (1, 1, -1)], [], R, R.base())
+        -q*t + 1
+        sage: _mac_cell([(0, 0, 1)], [(1, 0, 1)], R, R.base())
+        1/(-q + 1)
+    """
+    top = base({(int(a), int(b)): c for a, b, c in num})
+    bottom = base.one()
+    for a, b, mult in den:
+        bottom *= (base.one() - base({(int(a), int(b)): 1}))**int(mult)
+    return ring(top) / ring(bottom)
+
+
+def macdonald_j_table(n, ring):
+    r"""
+    Return the Macdonald `J` basis of degree ``n`` in the Schur basis, as
+    ``{Partition: {Partition: coefficient}}`` over ``ring``.
+
+    symfn expands `J` in the **monomial** basis, so this converts each row
+    afterwards -- through the classical conversion table, which is itself symfn
+    when this module is importable.  It is still far cheaper than the route
+    Sage takes, which reaches the Schur expansion through the `S` basis and its
+    creation operators.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import macdonald_j_table
+        sage: QQqt = QQ['q','t'].fraction_field()
+        sage: table = macdonald_j_table(2, QQqt)
+        sage: sorted(table[Partition([2])].items())
+        [([1, 1], -q*t + t^2 + q - t), ([2], q*t^2 - q*t - t + 1)]
+
+    It is the expansion Sage's own `J` basis gives::
+
+        sage: s = SymmetricFunctions(QQqt).s()
+        sage: s(SymmetricFunctions(QQqt).macdonald().J()[2])
+        -(q*t-t^2-q+t)*s[1, 1] + (q*t^2-q*t-t+1)*s[2]
+    """
+    from sage.combinat.sf.sf import SymmetricFunctions
+    base = ring.base()
+    sym = SymmetricFunctions(ring)
+    m, schur = sym.monomial(), sym.schur()
+    out = {}
+    for la in symfn.partitions(int(n)):
+        rows = symfn.macdonald_j(list(la))
+        elt = m._from_dict({_Partitions.from_parts(mu): _mac_cell(num, den, ring, base)
+                            for mu, num, den in rows})
+        out[_Partitions.from_parts(la)] = dict(schur(elt).monomial_coefficients())
+    return out
+
+
 def _integral_schur_terms(f):
     r"""
     Return ``f`` in the Schur basis as integer ``(partition, coefficient)``

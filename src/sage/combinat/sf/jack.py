@@ -898,12 +898,23 @@ class JackPolynomials_p(JackPolynomials_generic):
 
         if n in self._self_to_m_cache:
             return
-        self._self_to_m_cache[n] = {}
-        t = QQt.gen()
-        monomial = SymmetricFunctions(QQt).monomial()
         JP = SymmetricFunctions(QQt).jack().P()
-        JP._gram_schmidt(n, monomial, lambda p: part_scalar_jack(p, p, t),
-                         self._self_to_m_cache[n], upper_triangular=True)
+        from sage.libs.symfn import is_available
+        if is_available():
+            # symfn reaches P -> m by the Laplace-Beltrami eigenoperator
+            # recursion, which enumerates nothing; the Gram-Schmidt below is
+            # what walls this at degree 12.  Only the forward direction is
+            # replaced -- unlike Hall-Littlewood, where both were available and
+            # the inversion was the cost, here the inversion is already cheap
+            # and Gram-Schmidt is nearly all of it.
+            from sage.libs.symfn.backend import jack_p_table
+            self._self_to_m_cache[n] = jack_p_table(n, QQt)
+        else:
+            self._self_to_m_cache[n] = {}
+            t = QQt.gen()
+            monomial = SymmetricFunctions(QQt).monomial()
+            JP._gram_schmidt(n, monomial, lambda p: part_scalar_jack(p, p, t),
+                             self._self_to_m_cache[n], upper_triangular=True)
         JP._invert_morphism(n, QQt, self._self_to_m_cache,
                             self._m_to_self_cache, to_other_function=self._to_m)
 
