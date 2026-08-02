@@ -613,6 +613,51 @@ class IrreducibleCharacterBasis(Character_generic):
         return self._p.prod(self._b_power_k_r(Integer(k), Integer(r))
                             for k, r in gamma.to_exp_dict().items())
 
+    def product_on_basis(self, la, mu):
+        r"""
+        Return `\tilde{s}_\lambda \tilde{s}_\mu`.
+
+        The structure constants of this basis are the reduced (stable)
+        Kronecker coefficients, so this product is a Kronecker computation
+        wearing an ordinary product's clothes.
+
+        With the optional :ref:`symfn <spkg_symfn>` package installed the
+        coefficients are computed directly, which is what makes the sizes below
+        reachable; without it the product goes through the Schur basis, as every
+        other non-classical basis does.
+
+        EXAMPLES::
+
+            sage: st = SymmetricFunctions(QQ).st()
+            sage: st.product_on_basis(Partition([2]), Partition([1]))
+            st[1] + st[1, 1] + st[2] + st[2, 1] + st[3]
+            sage: st[2] * st[1]
+            st[1] + st[1, 1] + st[2] + st[2, 1] + st[3]
+
+        The product is inhomogeneous, since `\tilde{s}_\lambda` is::
+
+            sage: sorted(set(sum(mu) for mu in (st[2] * st[1]).support()))
+            [1, 2, 3]
+
+        Both routes give the same answer::
+
+            sage: s = SymmetricFunctions(QQ).s()
+            sage: all(st[la] * st[mu] == st(s(st[la]) * s(st[mu]))
+            ....:     for n in range(4) for la in Partitions(n) for mu in Partitions(n))
+            True
+
+        TESTS::
+
+            sage: st[[]] * st[2, 1]
+            st[2, 1]
+        """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import reduced_kronecker_product
+            return self._from_dict(
+                reduced_kronecker_product(la, mu, self.base_ring()))
+        return self(self._other(self[la]) * self._other(self[mu]))
+
     def _self_to_power_on_basis(self, lam):
         r"""
         An expansion of the irreducible character in the powersum basis.

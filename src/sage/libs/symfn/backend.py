@@ -358,6 +358,32 @@ def kostka_tab(shape, weight):
     return [Tableau(t) for t in symfn.semistandard_tableaux(list(shape), list(weight))]
 
 
+def reduced_kronecker_product(la, mu, ring):
+    r"""
+    Return `\tilde{s}_\lambda \tilde{s}_\mu` as a ``{Partition: coefficient}``
+    dictionary over ``ring``.
+
+    The structure constants of the Orellana-Zabrocki irreducible character basis
+    are the reduced (stable) Kronecker coefficients, so this is a Kronecker
+    computation wearing an ordinary product's clothes.  It is what
+    :meth:`sage.combinat.sf.character.IrreducibleCharacterBasis.product_on_basis`
+    calls, in place of going through the Schur basis.
+
+    Note that `\tilde{s}_\lambda` is **inhomogeneous** -- it has components in
+    every degree from 0 to `|\lambda|` -- so the result's degree is not the sum
+    of the inputs'.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import reduced_kronecker_product
+        sage: d = reduced_kronecker_product(Partition([2]), Partition([1]), ZZ)
+        sage: sorted(d.items())
+        [([1], 1), ([1, 1], 1), ([2], 1), ([2, 1], 1), ([3], 1)]
+    """
+    return {_Partitions.from_parts(nu): ring(c)
+            for nu, c in symfn.reduced_kronecker_product(list(la), list(mu))}
+
+
 def hall_littlewood(part):
     r"""
     Return `Q'_{\text{part}}` in the Schur basis, over `\ZZ[x]`.
