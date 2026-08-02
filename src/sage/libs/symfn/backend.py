@@ -463,6 +463,62 @@ def hall_littlewood_p_caches(n, ring):
     return p_to_s, s_to_p
 
 
+def hall_littlewood_qp_caches(n, ring):
+    r"""
+    Return **both** directions of the Hall-Littlewood `Q'` change of basis at
+    degree ``n``, as ``(Qp_to_s, s_to_Qp)``.
+
+    Each is ``{Partition: {Partition: coefficient}}`` over ``ring``.
+
+    Both are the Kostka-Foulkes matrix and its inverse, transposed relative to
+    how :func:`hall_littlewood_p_caches` uses them.  The two identities
+
+    .. MATH::
+
+        Q'_\lambda = \sum_\mu K_{\mu\lambda}(t)\, s_\mu,
+        \qquad
+        s_\mu = \sum_\lambda K_{\mu\lambda}(t)\, P_\lambda
+
+    use the same `K` with the index roles swapped, so `Q' \to s` is `K^T` and
+    `s \to Q'` is `(K^{-1})^T` -- that is, the transpose of `P \to s`, which
+    symfn produces by back-substitution in `\ZZ[t]`.
+
+    .. NOTE::
+
+        The transposition is exactly the kind of index-role swap that yields a
+        plausible wrong answer rather than an error, so it is checked against
+        Sage's own inverse rather than argued: see the doctest below.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import hall_littlewood_qp_caches
+        sage: QQt = QQ['t'].fraction_field()
+        sage: to_s, to_qp = hall_littlewood_qp_caches(3, QQt)
+        sage: sorted(to_s[Partition([2, 1])].items())
+        [([2, 1], 1), ([3], t)]
+        sage: sorted(to_qp[Partition([2, 1])].items())
+        [([2, 1], 1), ([3], -t)]
+
+    The two are inverse, and agree with Sage's own `Q'` basis::
+
+        sage: ST = SymmetricFunctions(QQt)
+        sage: ST.s()(ST.hall_littlewood().Qp()[2, 1])
+        s[2, 1] + t*s[3]
+    """
+    base = ring.base()
+    qp_to_s = {_Partitions.from_parts(la): {_Partitions.from_parts(mu): _t_poly(poly, ring, base)
+                                            for mu, poly in rows}
+               for la, rows in symfn.hall_littlewood_table(int(n))}
+    s_to_qp = {}
+    for la, rows in symfn.hall_littlewood_p_table(int(n)):
+        key = _Partitions.from_parts(la)
+        for mu, poly in rows:
+            s_to_qp.setdefault(_Partitions.from_parts(mu), {})[key] = _t_poly(poly, ring, base)
+    for mu in qp_to_s:
+        s_to_qp.setdefault(mu, {})
+    return qp_to_s, s_to_qp
+
+
 def _jack_cell(cell, ring, alpha):
     r"""
     Return one Jack coefficient as an element of ``ring``.

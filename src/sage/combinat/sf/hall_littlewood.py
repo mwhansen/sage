@@ -1070,6 +1070,18 @@ class HallLittlewood_qp(HallLittlewood_generic):
             sage: l(HLQp._self_to_s_cache[2])
             [([1, 1], [([1, 1], 1), ([2], t)]), ([2], [([2], 1)])]
         """
+        from sage.libs.symfn import is_available
+        if (is_available() and n not in self._self_to_s_cache
+                and n not in self._s_to_self_cache):
+            # Both directions, so ``_invert_morphism`` is not called: Q' -> s is
+            # the Kostka-Foulkes matrix and s -> Q' is the transpose of P -> s,
+            # which symfn takes by back-substitution in ZZ[t].  Sage's inverse
+            # is over QQ(t) and is the larger half of the cost here.
+            from sage.libs.symfn.backend import hall_littlewood_qp_caches
+            qp_to_s, s_to_qp = hall_littlewood_qp_caches(n, QQt)
+            self._self_to_s_cache[n] = qp_to_s
+            self._s_to_self_cache[n] = s_to_qp
+            return
         self._invert_morphism(n, QQt, self._self_to_s_cache,
                               self._s_to_self_cache,
                               to_other_function=self._to_s,
