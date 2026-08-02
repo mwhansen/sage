@@ -25,12 +25,55 @@ from sage.categories.homset import Hom
 from sage.categories.modules_with_basis import ModulesWithBasis
 from sage.categories.morphism import SetMorphism
 from sage.combinat.sf import sfa
-from sage.libs.symmetrica.symmetrica import (
-    hall_littlewood_symmetrica as hall_littlewood,
-)
 from sage.matrix.constructor import matrix
+from sage.misc.cachefunc import cached_function
 from sage.rings.rational_field import QQ
 from sage.structure.unique_representation import UniqueRepresentation
+
+
+@cached_function
+def _hall_littlewood_backend():
+    """
+    Return the backend's `Q'` transition function.
+
+    Resolved once rather than per call, and kept behind
+    :func:`hall_littlewood` so that the name that module-level code binds keeps
+    its own signature.
+
+    EXAMPLES::
+
+        sage: from sage.combinat.sf.hall_littlewood import _hall_littlewood_backend
+        sage: _hall_littlewood_backend()(Partition([2,1]))
+        s[2, 1] + x*s[3]
+    """
+    from sage.libs.symfn import is_available
+    if is_available():
+        from sage.libs.symfn.backend import hall_littlewood as symfn_hl
+        return symfn_hl
+    from sage.libs.symmetrica.symmetrica import hall_littlewood_symmetrica
+    return hall_littlewood_symmetrica
+
+
+def hall_littlewood(part):
+    r"""
+    Return `Q'_{\text{part}}` expanded in the Schur basis over `\ZZ[x]`.
+
+    The variable is ``x`` and not ``t`` because that is the ring Symmetrica
+    hands back, and :meth:`HallLittlewood_qp._to_s` substitutes for it by name.
+
+    This wraps whichever backend is installed -- the optional
+    :ref:`symfn <spkg_symfn>` package when it is present, Symmetrica otherwise
+    -- and takes the same argument either way.
+
+    EXAMPLES::
+
+        sage: from sage.combinat.sf.hall_littlewood import hall_littlewood
+        sage: hall_littlewood(Partition([2,1]))
+        s[2, 1] + x*s[3]
+        sage: hall_littlewood(Partition([1,1]))
+        s[1, 1] + x*s[2]
+    """
+    return _hall_littlewood_backend()(part)
 
 # P basis cache
 p_to_s_cache = {}
@@ -985,7 +1028,7 @@ class HallLittlewood_qp(HallLittlewood_generic):
         if not part:
             return lambda part2: QQt.one()
 
-        res = hall_littlewood(part) # call to symmetrica (returns in variable x)
+        res = hall_littlewood(part)  # returns in the variable x
         f = lambda part2: res.coefficient(part2).subs(x=t)
         return f
 

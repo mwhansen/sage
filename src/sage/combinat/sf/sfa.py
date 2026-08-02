@@ -5653,8 +5653,13 @@ class SymmetricFunctionAlgebra_generic_Element(CombinatorialFreeModule.Element):
         resPR = PolynomialRing(parent.base_ring(), n, alphabet)
         if self == parent.zero():
             return resPR.zero()
-        import sage.libs.symmetrica.all as symmetrica
-        e = getattr(symmetrica, 'compute_{}_with_alphabet'.format(classical.translate[parent.basis_name()].lower()))
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import compute_with_alphabet
+            e = compute_with_alphabet(parent.basis_name())
+        else:
+            import sage.libs.symmetrica.all as symmetrica
+            e = getattr(symmetrica, 'compute_{}_with_alphabet'.format(classical.translate[parent.basis_name()].lower()))
 
         def f(part):
             if not part:

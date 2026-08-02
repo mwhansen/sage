@@ -1,0 +1,4 @@
+ | $(PYTHON_TOOLCHAIN) $(PYTHON)
+
+symfn is a wheel: no build dependency beyond the Python toolchain, and in
+particular no Rust toolchain, since Sage installs the prebuilt artifact.

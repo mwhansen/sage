@@ -131,6 +131,13 @@ PARI
    sage/libs/pari/convert_sage
    sage/rings/pari_ring
 
+symfn
+-----
+.. toctree::
+   :maxdepth: 1
+
+   sage/libs/symfn/terms
+
 Symmetrica
 ----------
 .. toctree::
@@ -140,6 +147,6 @@ Symmetrica
 
 .. Cannot be imported independently of mpmath: sage/libs/mpmath/ext_main sage/libs/mpmath/ext_impl sage/libs/mpmath/ext_libmp
 
-.. Modules depending on optional packages: sage/libs/coxeter3/coxeter sage/libs/coxeter3/coxeter_group  sage/libs/homfly sage/libs/braiding
+.. Modules depending on optional packages: sage/libs/coxeter3/coxeter sage/libs/coxeter3/coxeter_group  sage/libs/homfly sage/libs/braiding sage/libs/symfn/backend sage/libs/symfn/extras
 
 .. include:: ../footer.txt

@@ -19,13 +19,37 @@ Monomial symmetric functions
 #                  https://www.gnu.org/licenses/
 # ****************************************************************************
 
-import sage.libs.symmetrica.all as symmetrica
 from sage.arith.misc import binomial, factorial, multinomial
 from sage.combinat.partition import _Partitions
+from sage.misc.cachefunc import cached_function
 from sage.rings.infinity import infinity
 from sage.rings.integer import Integer
 
 from . import classical
+
+
+@cached_function
+def _mult_monomial_monomial():
+    """
+    Return the backend's product of two monomial-basis elements.
+
+    The choice is made once rather than in the double loop of
+    :meth:`SymmetricFunctionAlgebra_monomial.product`, which calls it once per
+    pair of terms.
+
+    EXAMPLES::
+
+        sage: from sage.combinat.sf.monomial import _mult_monomial_monomial
+        sage: mult = _mult_monomial_monomial()
+        sage: mult({Partition([2]): ZZ(1)}, {Partition([1]): ZZ(1)})
+        m[2, 1] + m[3]
+    """
+    from sage.libs.symfn import is_available
+    if is_available():
+        from sage.libs.symfn.backend import mult_monomial_monomial
+        return mult_monomial_monomial
+    import sage.libs.symmetrica.all as symmetrica
+    return symmetrica.mult_monomial_monomial
 
 
 class SymmetricFunctionAlgebra_monomial(classical.SymmetricFunctionAlgebra_classical):
@@ -108,7 +132,7 @@ class SymmetricFunctionAlgebra_monomial(classical.SymmetricFunctionAlgebra_class
             sage: a^2
             x^2*m[] + 2*x*m[2, 1] + 4*m[2, 2, 1, 1] + 6*m[2, 2, 2] + 2*m[3, 2, 1] + 2*m[3, 3] + 2*m[4, 1, 1] + m[4, 2]
         """
-        # Use symmetrica to do the multiplication
+        # Use the kernel backend to do the multiplication
         # A = left.parent()
 
         # Hack due to symmetrica crashing when both of the
@@ -116,6 +140,7 @@ class SymmetricFunctionAlgebra_monomial(classical.SymmetricFunctionAlgebra_class
         # if  R is ZZ or R is QQ:
         #     return symmetrica.mult_monomial_monomial(left, right)
 
+        mult = _mult_monomial_monomial()
         z_elt = {}
         for left_m, left_c in left._monomial_coefficients.items():
             for right_m, right_c in right._monomial_coefficients.items():
@@ -126,8 +151,8 @@ class SymmetricFunctionAlgebra_monomial(classical.SymmetricFunctionAlgebra_class
                     z_elt[left_m] = left_c * right_c
                     continue
 
-                d = symmetrica.mult_monomial_monomial({left_m: Integer(1)},
-                                                      {right_m: Integer(1)}).monomial_coefficients()
+                d = mult({left_m: Integer(1)},
+                         {right_m: Integer(1)}).monomial_coefficients()
                 for m in d:
                     if m in z_elt:
                         z_elt[m] += left_c * right_c * d[m]

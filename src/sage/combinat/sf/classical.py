@@ -33,25 +33,50 @@ translate = {'monomial': 'MONOMIAL',
 conversion_functions = {}
 
 
-def init():
+def init(use_symfn=None):
     """
     Set up the conversion functions between the classical bases.
+
+    INPUT:
+
+    - ``use_symfn`` -- boolean (default: ``None``); which backend to install.
+      The default consults :func:`sage.libs.symfn.is_available`, so the
+      optional :ref:`symfn <spkg_symfn>` package is used when it is present and
+      Symmetrica when it is not.  Pass a boolean to force one of them, which is
+      what lets the two be compared on identical inputs.
 
     EXAMPLES::
 
         sage: from sage.combinat.sf.classical import init
         sage: sage.combinat.sf.classical.conversion_functions = {}
-        sage: init()
+        sage: init(use_symfn=False)
         sage: sage.combinat.sf.classical.conversion_functions[('Schur', 'powersum')]
         <cyfunction t_SCHUR_POWSYM_symmetrica at ...>
 
-    The following checks if the bug described in :issue:`15312` is fixed. ::
+        sage: sage.combinat.sf.classical.conversion_functions = {}
+        sage: init(use_symfn=True)                                                      # optional - symfn
+        sage: sage.combinat.sf.classical.conversion_functions[('Schur', 'powersum')]    # optional - symfn
+        <function t_Schur_powersum_symfn at ...>
 
+    Whichever backend is installed, the conversions agree::
+
+        sage: sage.combinat.sf.classical.conversion_functions = {}
+        sage: init()
         sage: change = sage.combinat.sf.classical.conversion_functions[('powersum', 'Schur')]
-        sage: hideme = change({Partition([1]*47):ZZ(1)}) # long time
         sage: change({Partition([2,2]):QQ(1)})
         s[1, 1, 1, 1] - s[2, 1, 1] + 2*s[2, 2] - s[3, 1] + s[4]
+
+    The following checks if the bug described in :issue:`15312` is fixed. ::
+
+        sage: hideme = change({Partition([1]*47):ZZ(1)}) # long time
     """
+    if use_symfn is None:
+        from sage.libs.symfn import is_available
+        use_symfn = is_available()
+    if use_symfn:
+        from sage.libs.symfn.backend import conversion_functions as symfn_table
+        conversion_functions.update(symfn_table())
+        return
     import sage.libs.symmetrica.all as symmetrica
     for other_basis, other_name in translate.items():
         for basis, name in translate.items():

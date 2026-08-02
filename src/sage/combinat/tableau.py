@@ -96,6 +96,7 @@ from sage.combinat.combinatorial_map import combinatorial_map
 from sage.combinat.composition import Compositions
 from sage.combinat.integer_vector import IntegerVectors, integer_vectors_nk_fast_iter
 from sage.combinat.subset import powerset
+from sage.misc.cachefunc import cached_function
 from sage.misc.inherit_comparison import InheritComparisonClasscallMetaclass
 from sage.misc.lazy_import import lazy_import
 from sage.misc.misc_c import prod
@@ -114,6 +115,31 @@ from sage.structure.unique_representation import UniqueRepresentation
 lazy_import('sage.combinat.posets.posets', 'Poset')
 lazy_import('sage.groups.perm_gps.permgroup', 'PermutationGroup')
 lazy_import('sage.libs.symmetrica', 'all', as_='symmetrica')
+
+
+@cached_function
+def _kostka_backend():
+    """
+    Return the backend's ``(kostka_number, kostka_tab)`` pair.
+
+    The order ``kostka_tab`` returns its tableaux in is part of the interface
+    rather than a formatting choice: :meth:`SemistandardTableaux_shape_weight.list`
+    hands it straight to the caller, and the doctests below print it.
+
+    EXAMPLES::
+
+        sage: from sage.combinat.tableau import _kostka_backend
+        sage: number, tab = _kostka_backend()
+        sage: number(Partition([3,2]), Partition([2,2,1]))                              # needs sage.modules
+        2
+        sage: tab(Partition([3,2]), Partition([2,2,1]))                                 # needs sage.modules
+        [[[1, 1, 2], [2, 3]], [[1, 1, 3], [2, 2]]]
+    """
+    from sage.libs.symfn import is_available
+    if is_available():
+        from sage.libs.symfn.backend import kostka_number, kostka_tab
+        return kostka_number, kostka_tab
+    return symmetrica.kostka_number, symmetrica.kostka_tab
 
 
 @richcmp_method
@@ -6992,7 +7018,7 @@ class SemistandardTableaux_shape_weight(SemistandardTableaux_shape):
     def cardinality(self):
         """
         Return the number of semistandard tableaux of the given shape and
-        weight, as computed by ``kostka_number`` function of ``symmetrica``.
+        weight, as computed by the ``kostka_number`` function of the backend.
 
         EXAMPLES::
 
@@ -7006,7 +7032,7 @@ class SemistandardTableaux_shape_weight(SemistandardTableaux_shape):
             sage: SemistandardTableaux([3,2,1], [2, 2, 2]).cardinality()
             2
         """
-        return symmetrica.kostka_number(self.shape, self.weight)
+        return _kostka_backend()[0](self.shape, self.weight)
 
     def __iter__(self):
         """
@@ -7018,13 +7044,13 @@ class SemistandardTableaux_shape_weight(SemistandardTableaux_shape):
             sage: sst[0].parent() is sst                                                # needs sage.modules
             True
         """
-        for t in symmetrica.kostka_tab(self.shape, self.weight):
+        for t in _kostka_backend()[1](self.shape, self.weight):
             yield self.element_class(self, t)
 
     def list(self):
         """
         Return a list of all semistandard tableaux in ``self`` generated
-        by symmetrica.
+        by the backend.
 
         EXAMPLES::
 
@@ -7038,7 +7064,7 @@ class SemistandardTableaux_shape_weight(SemistandardTableaux_shape):
             sage: SemistandardTableaux([3,2,1], [2, 2, 2]).list()
             [[[1, 1, 2], [2, 3], [3]], [[1, 1, 3], [2, 2], [3]]]
         """
-        return symmetrica.kostka_tab(self.shape, self.weight)
+        return _kostka_backend()[1](self.shape, self.weight)
 
     random_element = FiniteEnumeratedSets.ParentMethods._random_element_from_unrank
 

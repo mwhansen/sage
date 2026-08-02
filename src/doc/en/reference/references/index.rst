@@ -1928,6 +1928,10 @@ REFERENCES:
              algebras*, Comm. Math. Phys. (2012), Volume 314, Issue 1,
              pp 57-92. :doi:`10.1007/s00220-012-1519-7`, :arxiv:`1010.1465`.
 
+.. [CM2018] Erik Carlsson and Anton Mellit, *A proof of the shuffle
+            conjecture*, J. Amer. Math. Soc. 31 (2018), 661-697.
+            :doi:`10.1090/jams/893`, :arxiv:`1508.06239`.
+
 .. [CMN2014] David Coudert, Dorian Mazauric, and Nicolas Nisse, *Experimental
              Evaluation of a Branch and Bound Algorithm for computing
              Pathwidth*. In Symposium on Experimental Algorithms (SEA), volume
