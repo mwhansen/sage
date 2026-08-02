@@ -384,6 +384,38 @@ def reduced_kronecker_product(la, mu, ring):
             for nu, c in symfn.reduced_kronecker_product(list(la), list(mu))}
 
 
+def induced_trivial_product(la, mu, ring):
+    r"""
+    Return `\tilde{h}_\lambda \tilde{h}_\mu` as a ``{Partition: coefficient}``
+    dictionary over ``ring``, or ``None`` if the rule declines.
+
+    The Orellana-Zabrocki induced trivial character basis multiplies by a
+    double-coset matrix rule, which is cheap exactly where the partitions are
+    short and hopeless where they are long: `\tilde{h}_{(6,4)}^2` is a `2 \times
+    2` free block of at most 1225 matrices, while `\tilde{h}_{(1^{10})}^2` is a
+    `10 \times 10` block with row sums 1, which is `11^{10}`.
+
+    ``None`` is therefore a capacity answer and not a failure, and the caller is
+    expected to fall back to the Schur route on it.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import induced_trivial_product
+        sage: d = induced_trivial_product(Partition([2]), Partition([1, 1]), ZZ)
+        sage: sorted(d.items())
+        [([1, 1], 1), ([1, 1, 1], 2), ([2, 1, 1], 1)]
+
+    A long pair declines rather than enumerating::
+
+        sage: induced_trivial_product(Partition([1] * 10), Partition([1] * 10), ZZ) is None
+        True
+    """
+    rows = symfn.ht_multiply([(tuple(la), 1)], [(tuple(mu), 1)])
+    if rows is None:
+        return None
+    return {_Partitions.from_parts(nu): ring(c) for nu, c in rows}
+
+
 # --- Schubert polynomials ---------------------------------------------------
 #
 # These four are the sites in :mod:`sage.combinat.schubert_polynomial` that

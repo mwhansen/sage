@@ -390,6 +390,48 @@ class InducedTrivialCharacterBasis(InducedCharacterBases):
             basis_name="induced trivial symmetric group character",
             prefix='ht', graded=False)
 
+    def product_on_basis(self, la, mu):
+        r"""
+        Return `\tilde{h}_\lambda \tilde{h}_\mu`.
+
+        The structure constants of this basis are the analogue of the stable
+        Kronecker coefficients on the complete homogeneous basis.
+
+        With the optional :ref:`symfn <spkg_symfn>` package installed this uses
+        the double-coset matrix rule, which is cheap where the partitions are
+        short -- which is where the Schur route is slowest.  The rule is
+        hopeless where they are long, and declines there; the Schur route, which
+        is what runs without the package at all, takes over.
+
+        EXAMPLES::
+
+            sage: ht = SymmetricFunctions(QQ).ht()
+            sage: ht[2] * ht[1, 1]
+            ht[1, 1] + 2*ht[1, 1, 1] + ht[2, 1, 1]
+
+        Both routes agree wherever both run, including on the long partitions
+        where the matrix rule declines and the Schur route takes over::
+
+            sage: h = SymmetricFunctions(QQ).h()
+            sage: all(ht[la] * ht[mu] == ht(h(ht[la]) * h(ht[mu]))
+            ....:     for n in range(4) for la in Partitions(n) for mu in Partitions(n))
+            True
+            sage: ht[1,1,1,1] * ht[1,1,1,1] == ht(h(ht[1,1,1,1]) * h(ht[1,1,1,1]))
+            True
+
+        TESTS::
+
+            sage: ht[[]] * ht[2, 1]
+            ht[2, 1]
+        """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import induced_trivial_product
+            terms = induced_trivial_product(la, mu, self.base_ring())
+            if terms is not None:
+                return self._from_dict(terms)
+        return self(self._other(self[la]) * self._other(self[mu]))
+
 
 class RookIrreducibleCharacterBasis(InducedCharacterBases):
     r"""
