@@ -384,6 +384,135 @@ def reduced_kronecker_product(la, mu, ring):
             for nu, c in symfn.reduced_kronecker_product(list(la), list(mu))}
 
 
+# --- Schubert polynomials ---------------------------------------------------
+#
+# These four are the sites in :mod:`sage.combinat.schubert_polynomial` that
+# reach Symmetrica with no fallback of their own.  ``divided_difference`` is
+# deliberately not here: its default is ``algorithm='sage'``, a pure-Python
+# implementation, and its ``algorithm='symmetrica'`` branch names the backend it
+# wants -- answering that with a different one would make the argument a lie.
+#
+# ``scalar_product`` is not here either, and will not be: it needs
+# ``scalarproduct_schubert``, the one operation symfn does not have, and nothing
+# in sagelib calls it (see the coverage audit).  It stays with the optional
+# Symmetrica package.
+
+
+def _schub_terms(elt):
+    """
+    Return a Schubert element as symfn's ``(one-line word, coefficient)`` pairs.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import _schub_terms
+        sage: X = SchubertPolynomialRing(ZZ)
+        sage: sorted(_schub_terms(X([3, 2, 1]) + 2*X([2, 1])))
+        [([2, 1], 2), ([3, 2, 1], 1)]
+    """
+    return [(list(w), int(c)) for w, c in elt.monomial_coefficients().items()]
+
+
+def _schub_from(rows, parent):
+    """
+    Build an element of ``parent`` from symfn's ``(one-line word, coefficient)``
+    pairs.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import _schub_from
+        sage: X = SchubertPolynomialRing(ZZ)
+        sage: _schub_from([((2, 1), 3)], X)
+        3*X[2, 1]
+    """
+    from sage.combinat.permutation import Permutation
+    R = parent.base_ring()
+    return parent._from_dict({Permutation(list(w)).remove_extra_fixed_points(): R(c)
+                              for w, c in rows if c})
+
+
+def schubert_multiply(left, right, parent):
+    """
+    Return the product of two Schubert basis elements.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import schubert_multiply
+        sage: X = SchubertPolynomialRing(QQ)
+        sage: schubert_multiply(Permutation([3,2,1]), Permutation([2,1,3]), X)
+        X[4, 2, 1, 3]
+    """
+    return _schub_from(symfn.schubert_multiply([(list(left), 1)],
+                                               [(list(right), 1)]), parent)
+
+
+def schubert_multiply_variable(elt, i):
+    """
+    Return `x_i \\cdot f`, the signed Monk rule.
+
+    ``i`` is **0-based**, which is Sage's convention here and Symmetrica's;
+    symfn's own entry point is 1-based, and this is where the two are
+    reconciled.  Symmetrica is 0-based for this operation and 1-based for
+    ``divdiff_schubert``, so the adapter cannot pick one rule and apply it
+    everywhere.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import schubert_multiply_variable
+        sage: X = SchubertPolynomialRing(ZZ)
+        sage: schubert_multiply_variable(X([3, 2, 4, 1]), 0)
+        X[4, 2, 3, 1]
+        sage: schubert_multiply_variable(X([3, 2, 4, 1]), 2)
+        X[3, 2, 5, 1, 4] - X[3, 4, 2, 1] - X[4, 2, 3, 1]
+    """
+    rows = symfn.schubert_multiply_variable(_schub_terms(elt), int(i) + 1)
+    return _schub_from(rows, elt.parent())
+
+
+def schubert_expand(elt, ring):
+    """
+    Return a Schubert polynomial expanded into monomials, over ``ring``.
+
+    The number of variables is the length of the longest permutation in the
+    support -- not the width the monomials happen to need -- because that is
+    what Symmetrica does and the parent is visible: ``X([1,3,2]).expand()`` is
+    ``x0 + x1`` in a **three**-variable ring.  The empty permutation is the
+    degenerate case, and gets one variable rather than none.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import schubert_expand
+        sage: X = SchubertPolynomialRing(ZZ)
+        sage: schubert_expand(X([1, 3, 2]), ZZ)
+        x0 + x1
+        sage: schubert_expand(X([1, 3, 2]), ZZ).parent()
+        Multivariate Polynomial Ring in x0, x1, x2 over Integer Ring
+        sage: schubert_expand(X([1, 2]), ZZ).parent()
+        Multivariate Polynomial Ring in x0 over Integer Ring
+    """
+    from sage.rings.polynomial.polynomial_ring_constructor import PolynomialRing
+    rows = _schub_terms(elt)
+    n = max([len(w) for w, _ in rows] + [1])
+    terms = symfn.schubert_expand(rows)
+    R = PolynomialRing(ring, n, [f'x{i}' for i in range(n)])
+    return R({tuple(a) + (0,) * (n - len(a)): ring(c) for a, c in terms})
+
+
+def polynomial_to_schubert(poly, parent):
+    """
+    Return a polynomial written in the Schubert basis.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import polynomial_to_schubert
+        sage: X = SchubertPolynomialRing(ZZ)
+        sage: R.<x0, x1> = PolynomialRing(ZZ)
+        sage: polynomial_to_schubert(x0 + x1, X)
+        X[1, 3, 2]
+    """
+    terms = [(list(e), int(c)) for e, c in poly.monomial_coefficients().items()]
+    return _schub_from(symfn.polynomial_to_schubert(terms), parent)
+
+
 def hall_littlewood(part):
     r"""
     Return `Q'_{\text{part}}` in the Schur basis, over `\ZZ[x]`.

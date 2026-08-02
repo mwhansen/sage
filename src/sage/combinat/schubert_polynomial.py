@@ -150,7 +150,19 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
 
             sage: X([1]).expand() * X([2,1]).expand()
             x0
+
+        An element with more than one term in its support.  Symmetrica cannot
+        do this one -- it builds each term in a ring sized for that term and
+        then fails to add them -- so it needs the optional
+        :ref:`symfn <spkg_symfn>` package::
+
+            sage: (X([3,2,4,1]) + X([2,1])).expand()             # optional - symfn
+            x0^2*x1*x2 + x0
         """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import schubert_expand
+            return schubert_expand(self, self.parent().base_ring())
         p = symmetrica.t_SCHUBERT_POLYNOM(self)
         if not isinstance(p, MPolynomial):
             R = PolynomialRing(self.parent().base_ring(), 1, 'x0')
@@ -369,6 +381,10 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
             X[3, 2, 4, 5, 1]
         """
         if isinstance(i, Integer):
+            from sage.libs.symfn import is_available
+            if is_available():
+                from sage.libs.symfn.backend import schubert_multiply_variable
+                return schubert_multiply_variable(self, i)
             return symmetrica.mult_schubert_variable(self, i)
         raise TypeError("i must be an integer")
 
@@ -475,16 +491,35 @@ class SchubertPolynomialRing_xbasis(CombinatorialFreeModule):
             perm = x.remove_extra_fixed_points()
             return self._from_dict({perm: self.base_ring().one()})
         if isinstance(x, MPolynomial):
-            return symmetrica.t_POLYNOM_SCHUBERT(x)
+            return self._from_polynomial(x)
         if isinstance(x, InfinitePolynomial):
             R = x.polynomial().parent()
-            # massage the term order to be what symmetrica expects
+            # massage the term order to be what the backend expects
             S = PolynomialRing(R.base_ring(),
                                names=list(map(repr, reversed(R.gens()))))
-            return symmetrica.t_POLYNOM_SCHUBERT(S(x.polynomial()))
+            return self._from_polynomial(S(x.polynomial()))
         if isinstance(x, OperatorPolynomial):
             return self(x.expand())
         raise TypeError
+
+    def _from_polynomial(self, x):
+        """
+        Return the polynomial ``x`` written in the Schubert basis.
+
+        EXAMPLES::
+
+            sage: X = SchubertPolynomialRing(ZZ)
+            sage: R.<x0, x1> = PolynomialRing(ZZ)
+            sage: X._from_polynomial(x0 + x1)
+            X[1, 3, 2]
+            sage: X._from_polynomial(R.one())
+            X[1]
+        """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import polynomial_to_schubert
+            return polynomial_to_schubert(x, self)
+        return symmetrica.t_POLYNOM_SCHUBERT(x)
 
     def some_elements(self):
         """
@@ -509,4 +544,8 @@ class SchubertPolynomialRing_xbasis(CombinatorialFreeModule):
             sage: X.product_on_basis(p1,p2)
             X[4, 2, 1, 3]
         """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import schubert_multiply
+            return schubert_multiply(left, right, self)
         return symmetrica.mult_schubert_schubert(left, right)
