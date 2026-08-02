@@ -67,18 +67,6 @@ from sage.rings.rational_field import QQ
 # Sage's basis names, as they appear as keys in ``conversion_functions``.
 NAMES = ['Schur', 'monomial', 'homogeneous', 'elementary', 'powersum']
 
-_TO_SCHUR = {
-    'monomial': symfn.monomial_to_schur,
-    'homogeneous': symfn.homogeneous_to_schur,
-    'elementary': symfn.elementary_to_schur,
-    'powersum': symfn.power_to_schur,
-}
-_FROM_SCHUR = {
-    'monomial': symfn.schur_to_monomial,
-    'homogeneous': symfn.schur_to_homogeneous,
-    'elementary': symfn.schur_to_elementary,
-}
-
 # Sage ``Partition`` objects for a whole degree, in symfn's own order.
 #
 # ``symfn.convert_indexed`` returns the *position* of each output partition in
@@ -179,9 +167,6 @@ def _convert(d, src, dst):
     den = reduce(lcm, (int(QQ(v).denominator()) for _, v in items), 1)
     terms = [(list(k), int(QQ(v) * den)) for k, v in items]
 
-    if src != 'Schur':
-        terms = _TO_SCHUR[src](terms)
-
     # Fast path: an integral input converting to an integral basis, which is
     # nearly every call.  Everything below stays in Python integers and `\ZZ`,
     # and the output is walked **once**.
@@ -193,7 +178,7 @@ def _convert(d, src, dst):
     # a rational input or from ``Schur -> powersum``, so the common case should
     # not pay for them.
     if den == 1 and dst != 'powersum':
-        raw = symfn.convert_indexed(terms, 'Schur', dst)
+        raw = symfn.convert_indexed(terms, src, dst)
         # Degrees come from the *input*: a basis change preserves degree, and
         # the input has a handful of terms where the output has thousands.
         # Deriving them from ``raw`` instead puts a full Python pass back over
@@ -204,11 +189,9 @@ def _convert(d, src, dst):
         return _basis(ZZ, dst)._from_dict(build_terms(raw, by_degree))
 
     if dst == 'powersum':
-        out = [(k, QQ(n) / QQ(dd) / den) for k, (n, dd) in symfn.schur_to_power(terms)]
-    elif dst == 'Schur':
-        out = [(k, QQ(c) / den) for k, c in terms]
+        out = [(k, QQ(n) / QQ(dd) / den) for k, (n, dd) in symfn.to_power(terms, src)]
     else:
-        out = [(k, QQ(c) / den) for k, c in _FROM_SCHUR[dst](terms)]
+        out = [(k, QQ(c) / den) for k, c in symfn.convert_terms(terms, src, dst)]
 
     out = [(k, v) for k, v in out if v]
     ring = ZZ if all(QQ(v).denominator() == 1 for _, v in out) else QQ
@@ -737,6 +720,75 @@ def induced_trivial_product(la, mu, ring):
     if rows is None:
         return None
     return {_Partitions.from_parts(nu): ring(c) for nu, c in rows}
+
+
+def character_expand(f, kind):
+    r"""
+    Return ``f`` rewritten in the ``kind`` character basis as a
+    ``{Partition: coefficient}`` dictionary, or ``None`` if it cannot be.
+
+    ``kind`` is ``'st'`` (irreducible) or ``'ht'`` (induced trivial), and ``f``
+    is given in the basis that character basis peels against -- Schur for
+    ``st``, complete homogeneous for ``ht``.
+
+    This replaces the peel in
+    :meth:`~sage.combinat.sf.character.Character_generic._other_to_self`, which
+    removes one leading term at a time and expands it, so that a degree-16
+    element costs thousands of small conversions rather than one large one.
+    Both directions of the change of basis have integer matrices, so a whole
+    element crosses at once.
+
+    ``None`` says the coefficients are not integers, which the whole-element
+    route cannot carry; the caller falls back to the peel, which can.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import character_expand
+        sage: Sym = SymmetricFunctions(QQ)
+        sage: h, s = Sym.h(), Sym.s()
+        sage: sorted(character_expand(h[2] + h([]), 'ht').items())
+        [([], 1), ([1], 1), ([2], 1)]
+        sage: sorted(character_expand(s[1] + s([]), 'st').items())
+        [([], 2), ([1], 1)]
+        sage: character_expand(s[1] / 2, 'st') is None
+        True
+    """
+    rows = []
+    for mu, c in f.monomial_coefficients().items():
+        if c not in ZZ:
+            return None
+        rows.append((tuple(mu), int(ZZ(c))))
+    if kind == 'ht':
+        rows = symfn.convert_terms(rows, 'homogeneous', 'Schur')
+    out = (symfn.schur_to_st if kind == 'st' else symfn.schur_to_ht)(rows)
+    ring = f.parent().base_ring()
+    return {_Partitions.from_parts(nu): ring(c) for nu, c in out}
+
+
+def character_contract(la, kind, parent):
+    r"""
+    Return the ``kind`` character basis element indexed by ``la``, in
+    ``parent`` -- the basis that character basis peels against.
+
+    The inverse direction of :func:`character_expand`, and the one the peel
+    calls once per term it removes.  Both are whole-element conversions here.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import character_contract
+        sage: Sym = SymmetricFunctions(QQ)
+        sage: character_contract(Partition([2, 1]), 'ht', Sym.h())
+        h[1] - 2*h[1, 1] + h[2, 1]
+        sage: character_contract(Partition([1, 1]), 'st', Sym.s())
+        s[] - s[1] + s[1, 1]
+    """
+    rows = [(tuple(la), 1)]
+    rows = (symfn.st_to_schur if kind == 'st' else symfn.ht_to_schur)(rows)
+    if kind == 'ht':
+        rows = symfn.convert_terms(rows, 'Schur', 'homogeneous')
+    ring = parent.base_ring()
+    return parent._from_dict({_Partitions.from_parts(nu): ring(c)
+                              for nu, c in rows})
 
 
 # --- Schubert polynomials ---------------------------------------------------

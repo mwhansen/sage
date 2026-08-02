@@ -11,6 +11,10 @@ Use :func:`is_available` to choose between the two.  Everything that imports
 ``symfn`` itself lives in :mod:`~sage.libs.symfn.backend` and
 :mod:`~sage.libs.symfn.extras`, so importing this module is safe with or
 without the package.
+
+Setting the environment variable ``SAGE_DISABLE_SYMFN`` to a nonempty value
+makes an installed ``symfn`` invisible, which is how the two backends are
+compared on identical inputs without uninstalling anything.
 """
 
 # ****************************************************************************
@@ -31,6 +35,15 @@ def is_available():
     call from a code path that runs often -- but not from one that runs once
     per term.
 
+    Setting ``SAGE_DISABLE_SYMFN`` in the environment answers ``False`` however
+    the package is installed.  Every site that chooses a backend consults this
+    one function, so that variable puts the whole of Sage back on Symmetrica --
+    which is what makes an A/B of the two possible in a process that has the
+    package.  The variable is read by :class:`~sage.features.symfn.Symfn`
+    rather than here, so the doctest framework sees the same answer and skips
+    the ``# optional - symfn`` tests instead of running them against
+    Symmetrica.
+
     EXAMPLES::
 
         sage: from sage.libs.symfn import is_available
@@ -38,6 +51,17 @@ def is_available():
         True
         sage: is_available() in (True, False)
         True
+
+    The switch belongs to :class:`~sage.features.symfn.Symfn`, and has to be
+    set before the process starts, because
+    :meth:`sage.features.Feature.is_present` caches its answer::
+
+        sage: from sage.features.symfn import Symfn
+        sage: import os
+        sage: os.environ['SAGE_DISABLE_SYMFN'] = '1'
+        sage: bool(Symfn()._is_present())
+        False
+        sage: del os.environ['SAGE_DISABLE_SYMFN']
     """
     from sage.features.symfn import Symfn
     return bool(Symfn().is_present())

@@ -11,7 +11,9 @@ Check for ``symfn``
 #                  https://www.gnu.org/licenses/
 # *****************************************************************************
 
-from . import PythonModule
+import os
+
+from . import FeatureTestResult, PythonModule
 
 
 class Symfn(PythonModule):
@@ -26,12 +28,36 @@ class Symfn(PythonModule):
 
     Symmetrica remains the fallback, so nothing in Sage requires this feature.
 
+    Setting the environment variable ``SAGE_DISABLE_SYMFN`` to a nonempty value
+    makes the feature absent however the package is installed, which is what
+    lets the two backends be compared on identical inputs -- and, because the
+    doctest framework asks this same feature, keeps ``# optional - symfn``
+    doctests from running against the backend they are not testing.
+
     EXAMPLES::
 
         sage: from sage.features.symfn import Symfn
         sage: Symfn().is_present()                        # optional - symfn
         FeatureTestResult('symfn', True)
     """
+
+    def _is_present(self):
+        r"""
+        Return whether ``symfn`` is importable and not switched off.
+
+        EXAMPLES::
+
+            sage: import os
+            sage: from sage.features.symfn import Symfn
+            sage: os.environ['SAGE_DISABLE_SYMFN'] = '1'
+            sage: bool(Symfn()._is_present())
+            False
+            sage: del os.environ['SAGE_DISABLE_SYMFN']
+        """
+        if os.environ.get('SAGE_DISABLE_SYMFN'):
+            return FeatureTestResult(self, False,
+                                     reason='SAGE_DISABLE_SYMFN is set')
+        return super()._is_present()
     def __init__(self):
         r"""
         TESTS::

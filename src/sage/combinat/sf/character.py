@@ -390,6 +390,64 @@ class InducedTrivialCharacterBasis(InducedCharacterBases):
             basis_name="induced trivial symmetric group character",
             prefix='ht', graded=False)
 
+
+    def _other_to_self(self, sexpr):
+        r"""
+        Convert an expression in the complete homogeneous basis to this basis.
+
+        With the optional :ref:`symfn <spkg_symfn>` package installed the whole
+        element crosses at once.  Without it, :meth:`Character_generic._other_to_self`
+        peels: one leading term removed and expanded per step, which is thousands
+        of small conversions where this is one.
+
+        The whole-element route needs integer coefficients, and hands back to
+        the peel when it does not have them.
+
+        EXAMPLES::
+
+            sage: Sym = SymmetricFunctions(QQ)
+            sage: h, ht = Sym.h(), Sym.ht()
+            sage: ht._other_to_self(h[2] + h([]))
+            ht[] + ht[1] + ht[2]
+
+        Both routes agree, coefficient ring by coefficient ring::
+
+            sage: other = ht._other
+            sage: all(ht(other(ht[la])) == ht[la]
+            ....:     for n in range(6) for la in Partitions(n))
+            True
+        """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import character_expand
+            terms = character_expand(sexpr, 'ht')
+            if terms is not None:
+                return self._from_dict(terms)
+        return super()._other_to_self(sexpr)
+
+    @cached_method
+    def _self_to_other_on_basis(self, lam):
+        r"""
+        An expansion of this basis in the complete homogeneous basis.
+
+        With the optional :ref:`symfn <spkg_symfn>` package installed this is a
+        single conversion; without it,
+        :meth:`Character_generic._self_to_other_on_basis` goes through the power
+        sums, whose products it builds one at a time in Python.
+
+        EXAMPLES::
+
+            sage: Sym = SymmetricFunctions(QQ)
+            sage: ht = Sym.ht()
+            sage: ht._self_to_other_on_basis(Partition([2, 1]))
+            h[1] - 2*h[1, 1] + h[2, 1]
+        """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import character_contract
+            return character_contract(lam, 'ht', self._other)
+        return super()._self_to_other_on_basis(lam)
+
     def product_on_basis(self, la, mu):
         r"""
         Return `\tilde{h}_\lambda \tilde{h}_\mu`.
@@ -655,6 +713,42 @@ class IrreducibleCharacterBasis(Character_generic):
         return self._p.prod(self._b_power_k_r(Integer(k), Integer(r))
                             for k, r in gamma.to_exp_dict().items())
 
+
+    def _other_to_self(self, sexpr):
+        r"""
+        Convert an expression in the Schur basis to this basis.
+
+        With the optional :ref:`symfn <spkg_symfn>` package installed the whole
+        element crosses at once.  Without it, :meth:`Character_generic._other_to_self`
+        peels: one leading term removed and expanded per step, which is thousands
+        of small conversions where this is one.
+
+        The whole-element route needs integer coefficients, and hands back to
+        the peel when it does not have them.
+
+        EXAMPLES::
+
+            sage: Sym = SymmetricFunctions(QQ)
+            sage: s, st = Sym.s(), Sym.st()
+            sage: st._other_to_self(s[1] + s([]))
+            2*st[] + st[1]
+
+        Both routes agree, coefficient ring by coefficient ring::
+
+            sage: other = st._other
+            sage: all(st(other(st[la])) == st[la]
+            ....:     for n in range(6) for la in Partitions(n))
+            True
+        """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import character_expand
+            terms = character_expand(sexpr, 'st')
+            if terms is not None:
+                return self._from_dict(terms)
+        return super()._other_to_self(sexpr)
+
+
     def product_on_basis(self, la, mu):
         r"""
         Return `\tilde{s}_\lambda \tilde{s}_\mu`.
@@ -757,4 +851,8 @@ class IrreducibleCharacterBasis(Character_generic):
             sage: st._self_to_other_on_basis(Partition([2,1]))
             3*s[1] - 2*s[1, 1] - 2*s[2] + s[2, 1]
         """
+        from sage.libs.symfn import is_available
+        if is_available():
+            from sage.libs.symfn.backend import character_contract
+            return character_contract(lam, 'st', self._other)
         return self._other(self._self_to_power_on_basis(lam))
