@@ -855,6 +855,20 @@ class HallLittlewood_p(HallLittlewood_generic):
             sage: l(HLP._s_to_self_cache[2])
             [([1, 1], [([1, 1], 1)]), ([2], [([1, 1], t), ([2], 1)])]
         """
+        from sage.libs.symfn import is_available
+        if (is_available() and n not in self._self_to_s_cache
+                and n not in self._s_to_self_cache):
+            # Both directions come from symfn, and neither is obtained by
+            # inverting the other here.  s -> P *is* the Kostka-Foulkes matrix,
+            # and P -> s is its inverse taken by back-substitution in ZZ[t],
+            # which never divides.  :meth:`_invert_morphism` would instead solve
+            # over QQ(t), and at degree 15 that solve alone costs an order of
+            # magnitude more than producing both directions from scratch.
+            from sage.libs.symfn.backend import hall_littlewood_p_caches
+            p_to_s, s_to_p = hall_littlewood_p_caches(n, QQt)
+            self._self_to_s_cache[n] = p_to_s
+            self._s_to_self_cache[n] = s_to_p
+            return
         self._invert_morphism(n, QQt, self._self_to_s_cache,
                               self._s_to_self_cache, to_self_function=self._s_to_self_base,
                               upper_triangular=True, ones_on_diagonal=True)

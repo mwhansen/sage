@@ -384,6 +384,85 @@ def reduced_kronecker_product(la, mu, ring):
             for nu, c in symfn.reduced_kronecker_product(list(la), list(mu))}
 
 
+def _t_poly(poly, ring, base):
+    """
+    Return an exponent-keyed row as an element of ``ring``.
+
+    ``base`` is the polynomial ring underneath: building the value there from
+    its coefficient dictionary and coercing once is a single construction,
+    where summing ``c * t^e`` inside a fraction field builds a rational function
+    per monomial and then adds them.  This runs once per nonzero entry of a
+    `p(n) \\times p(n)` table, so the difference is the marshalling cost of the
+    whole change of basis.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import _t_poly
+        sage: R = QQ['t'].fraction_field()
+        sage: _t_poly([(0, 1), (2, -3)], R, R.base())
+        -3*t^2 + 1
+    """
+    return ring(base({int(e): c for e, c in poly}))
+
+
+def hall_littlewood_p_caches(n, ring):
+    r"""
+    Return **both** directions of the Hall-Littlewood `P` change of basis at
+    degree ``n``, as ``(P_to_s, s_to_P)``.
+
+    Each is ``{Partition: {Partition: coefficient}}`` over ``ring``, which must
+    contain ``t``.
+
+    Neither direction is obtained by inverting the other here, and that is the
+    point.  The two are related by
+
+    .. MATH::
+
+        s_\mu = \sum_\lambda K_{\mu\lambda}(t) P_\lambda,
+        \qquad
+        Q'_\lambda = \sum_\mu K_{\mu\lambda}(t) s_\mu,
+
+    the same Kostka-Foulkes matrix read in two directions, so ``s_to_P`` *is*
+    that matrix and needs no work beyond being marshalled.  ``P_to_s`` is its
+    inverse, but symfn takes it by back-substitution in `\ZZ[t]` -- `K` is
+    unitriangular in dominance order, so solving never divides -- rather than by
+    a linear solve over `\QQ(t)`.  Sage's :meth:`_invert_morphism` has to do the
+    latter, and at degree 15 that inversion alone is an order of magnitude more
+    than producing both directions from scratch.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import hall_littlewood_p_caches
+        sage: QQt = QQ['t'].fraction_field()
+        sage: to_s, to_P = hall_littlewood_p_caches(3, QQt)
+        sage: sorted(to_s[Partition([3])].items())
+        [([1, 1, 1], t^2), ([2, 1], -t), ([3], 1)]
+        sage: sorted(to_P[Partition([3])].items())
+        [([1, 1, 1], t^3), ([2, 1], t), ([3], 1)]
+
+    They are inverse to each other, and agree with Sage's own `P` basis::
+
+        sage: s = SymmetricFunctions(QQt).s()
+        sage: s(SymmetricFunctions(QQt).hall_littlewood().P()[3])
+        t^2*s[1, 1, 1] - t*s[2, 1] + s[3]
+    """
+    base = ring.base()
+    p_to_s = {_Partitions.from_parts(la): {_Partitions.from_parts(mu): _t_poly(poly, ring, base)
+                                           for mu, poly in rows}
+              for la, rows in symfn.hall_littlewood_p_table(int(n))}
+    order = [_Partitions.from_parts(p) for p in symfn.partitions(int(n))]
+    matrix = symfn.kostka_foulkes_table(int(n))
+    s_to_p = {}
+    for i, mu in enumerate(order):
+        row = {}
+        for j, la in enumerate(order):
+            poly = matrix[i][j]
+            if poly:
+                row[la] = _t_poly(poly, ring, base)
+        s_to_p[mu] = row
+    return p_to_s, s_to_p
+
+
 def _integral_schur_terms(f):
     r"""
     Return ``f`` in the Schur basis as integer ``(partition, coefficient)``
