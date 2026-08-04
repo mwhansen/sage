@@ -569,7 +569,7 @@ def jack_p_table(n, ring):
             for la, cells in symfn.jack_table(int(n))}
 
 
-def _mac_cell(num, den, ring, base):
+def _mac_cell(num, den, ring, base, normalize=True):
     r"""
     Return one Macdonald coefficient as an element of ``ring``.
 
@@ -583,6 +583,19 @@ def _mac_cell(num, den, ring, base):
     field wants the product, and expanding here to refactor there is work done
     twice.
 
+    With ``normalize`` the sign is set so that the denominator's leading
+    coefficient is positive.  `\QQ(q,t)` does not canonicalize it -- `(q-t)/(q
+    t^4 - \cdots)` and `(t-q)/(t^3 + \cdots - q t^4)` are the same element and
+    print differently -- and each `1 - q^a t^b` contributes a `-1`, so an odd
+    number of factors would otherwise come back negated.  This is not a nicety:
+    it is the representative Sage's own solve produces, and matching it is what
+    keeps installing the backend from rewriting printed output across the
+    symmetric-function doctests.
+
+    Pass ``normalize=False`` where Sage does not reduce either -- a reciprocal
+    it forms by inverting a polynomial directly, rather than by dividing two
+    fractions through a gcd.
+
     EXAMPLES::
 
         sage: from sage.libs.symfn.backend import _mac_cell
@@ -590,12 +603,16 @@ def _mac_cell(num, den, ring, base):
         sage: _mac_cell([(0, 0, 1), (1, 1, -1)], [], R, R.base())
         -q*t + 1
         sage: _mac_cell([(0, 0, 1)], [(1, 0, 1)], R, R.base())
+        (-1)/(q - 1)
+        sage: _mac_cell([(0, 0, 1)], [(1, 0, 1)], R, R.base(), normalize=False)
         1/(-q + 1)
     """
     top = base({(int(a), int(b)): c for a, b, c in num})
     bottom = base.one()
     for a, b, mult in den:
         bottom *= (base.one() - base({(int(a), int(b)): 1}))**int(mult)
+    if normalize and bottom.lc() < 0:
+        top, bottom = -top, -bottom
     return ring(top) / ring(bottom)
 
 
@@ -635,6 +652,48 @@ def macdonald_j_table(n, ring):
                             for mu, num, den in rows})
         out[_Partitions.from_parts(la)] = dict(schur(elt).monomial_coefficients())
     return out
+
+
+def macdonald_s_to_j_table(n, ring):
+    r"""
+    Return the Schur functions of degree ``n`` in the Macdonald `J` basis, as
+    ``{Partition: {Partition: coefficient}}`` over ``ring``.
+
+    This is the inverse of :func:`macdonald_j_table`, and symfn does not invert
+    anything to get it: `\{J_\mu\}` is orthogonal for the `(q,t)` scalar
+    product, so each coefficient is a projection `\langle s_\lambda, J_\mu
+    \rangle / \langle J_\mu, J_\mu \rangle` read off one `(q,t)`-Kostka table.
+    Sage's ``_invert_morphism`` reaches the same matrix by a triangular solve
+    over `\QQ(q,t)`.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import macdonald_s_to_j_table
+        sage: QQqt = QQ['q','t'].fraction_field()
+        sage: table = macdonald_s_to_j_table(2, QQqt)
+        sage: sorted(table[Partition([2])].items())
+        [([1, 1], (q - t)/(q*t^4 - q*t^3 - q*t^2 - t^3 + q*t + t^2 + t - 1)),
+         ([2], 1/(q*t^2 - q*t - t + 1))]
+
+    It is the expansion Sage's own `J` basis gives::
+
+        sage: J = SymmetricFunctions(QQqt).macdonald().J()
+        sage: J(SymmetricFunctions(QQqt).s()[2])
+        ((q-t)/(q*t^4-q*t^3-q*t^2-t^3+q*t+t^2+t-1))*McdJ[1, 1]
+         + (1/(q*t^2-q*t-t+1))*McdJ[2]
+    """
+    base = ring.base()
+    # The diagonal is `1/c_\lambda`, which ``_invert_morphism`` forms by
+    # inverting the polynomial and nothing else, so it keeps whatever sign the
+    # product of `1 - q^a t^b` expanded to; every other entry it reaches by
+    # dividing through a gcd, which normalizes.  Matching both is what makes
+    # this table print exactly as Sage's own solve does -- checked cell by cell
+    # against it through degree 6.
+    return {_Partitions.from_parts(la):
+            {_Partitions.from_parts(mu):
+             _mac_cell(num, den, ring, base, normalize=(la != mu))
+             for mu, num, den in row}
+            for la, row in symfn.schur_in_macdonald_j(int(n))}
 
 
 def _integral_schur_terms(f):

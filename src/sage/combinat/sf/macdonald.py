@@ -1131,32 +1131,31 @@ class MacdonaldPolynomials_j(MacdonaldPolynomials_generic):
             [([1, 1], [([1, 1], t^3 - t^2 - t + 1)]),
              ([2], [([1, 1], -q*t + t^2 + q - t), ([2], q*t^2 - q*t - t + 1)])]
         """
-        to_s = self._to_s
         from sage.libs.symfn import is_available
-        if is_available() and n not in self._self_to_s_cache:
-            # symfn reaches J directly, where ``_to_s`` goes through the S basis
-            # and its creation operators one shape at a time.  The table has to
-            # be handed to ``_invert_morphism`` as the function it calls, not
-            # merely left in the cache: it recomputes the known direction unless
-            # *both* caches already hold the degree, so pre-filling alone buys
-            # nothing.
-            from sage.libs.symfn.backend import macdonald_j_table
-            rows = macdonald_j_table(n, QQqt)
-            zero = QQqt.zero()
+        if (is_available() and n not in self._self_to_s_cache
+                and n not in self._s_to_self_cache):
+            # Both directions come from symfn, and neither is obtained by
+            # inverting the other here.  ``_to_s`` reaches the Schur expansion
+            # through the `S` basis and its creation operators one shape at a
+            # time; symfn reaches `J` directly.  For the inverse it does not
+            # solve at all -- `\{J_\mu\}` is orthogonal for the `(q,t)` scalar
+            # product, so every coefficient of `s_\lambda` is a projection, and
+            # a whole degree of them comes off one `(q,t)`-Kostka table.
+            from sage.libs.symfn.backend import (macdonald_j_table,
+                                                 macdonald_s_to_j_table)
+            self._self_to_s_cache[n] = macdonald_j_table(n, QQqt)
+            self._s_to_self_cache[n] = macdonald_s_to_j_table(n, QQqt)
+            return
 
-            def to_s(la, rows=rows, zero=zero):
-                row = rows[la]
-                return lambda mu: row.get(mu, zero)
-
-        # The inverse stays Sage's.  J -> s *is* triangular in this order, but
-        # ``_invert_morphism``'s triangular branch is O(p(n)^3) like its dense
-        # one, so the flag buys nothing here and is not set; measured at 10.4s
-        # against 10.6s at degree 9.  What is left after the fill is replaced is
-        # this solve, and closing it needs the s -> J direction, which symfn
-        # does not have.
+        # ``_invert_morphism`` recomputes the known direction unless *both*
+        # caches already hold the degree, so the table has to be handed to it as
+        # the function it calls rather than merely left in the cache.  Its
+        # triangular branch is O(p(n)^3) like its dense one -- J -> s *is*
+        # triangular in this order -- so the flag buys nothing and is not set;
+        # measured at 10.4s against 10.6s at degree 9.
         self._invert_morphism(n, QQqt, self._self_to_s_cache,
                               self._s_to_self_cache,
-                              to_other_function=to_s,
+                              to_other_function=self._to_s,
                               upper_triangular=False)
 
     def _to_s(self, part):
