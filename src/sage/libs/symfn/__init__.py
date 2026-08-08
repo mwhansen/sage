@@ -29,7 +29,16 @@ compared on identical inputs without uninstalling anything.
 
 def is_available():
     r"""
-    Return whether the optional ``symfn`` package is installed and importable.
+    Return whether the optional ``symfn`` package is installed, importable, and
+    new enough to answer every call this package makes of it.
+
+    Importable is not enough, which is why the version matters here: a ``symfn``
+    older than :data:`~sage.features.symfn.SYMFN_MINIMUM_VERSION` imports
+    perfectly well and is missing entry points
+    :mod:`sage.libs.symfn.backend` calls, so treating it as present would turn a
+    basis conversion into an :exc:`AttributeError` rather than a fallback to
+    Symmetrica.  An old install left behind by an earlier ``pip install`` is the
+    ordinary way that happens.
 
     The result is cached by the feature machinery, so this is cheap enough to
     call from a code path that runs often -- but not from one that runs once
