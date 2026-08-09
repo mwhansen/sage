@@ -169,7 +169,7 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
             p = R(p)
         return p
 
-    def divided_difference(self, i, algorithm='sage'):
+    def divided_difference(self, i, algorithm=None):
         r"""
         Return the ``i``-th divided difference operator, applied to ``self``.
 
@@ -179,12 +179,13 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
 
         - ``i`` -- permutation or positive integer
 
-        - ``algorithm`` -- (default: ``'sage'``) one of ``'sage'``,
-          ``'symfn'`` or ``'symmetrica'``; this determines which software is
-          called for the computation.  ``'symfn'`` needs the
-          :ref:`symfn <spkg_symfn>` package, and agrees with ``'sage'``
-          everywhere, including on an index past the permutation's length
-          where ``'symmetrica'`` raises instead
+        - ``algorithm`` -- one of ``'sage'``, ``'symfn'`` or ``'symmetrica'``;
+          this determines which software is called for the computation.  The
+          default is ``'symfn'`` when the :ref:`symfn <spkg_symfn>` package is
+          installed and ``'sage'`` otherwise, so the value does not depend on
+          what is installed -- only the speed does.  ``'symfn'`` agrees with
+          ``'sage'`` everywhere, including on an index past the permutation's
+          length, where ``'symmetrica'`` raises instead
 
         OUTPUT:
 
@@ -295,13 +296,19 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
             ...
             ValueError: cannot apply \delta_{5} to a (= X[3, 2, 1])
         """
+        if algorithm is None:
+            from sage.libs.symfn import is_available
+            algorithm = "symfn" if is_available() else "sage"
         if not self:  # if self is 0
             return self
         Perms = Permutations()
         if i in ZZ:
+            # `\delta_i` is undefined for `i \leq 0` whichever library answers,
+            # and the message is Sage's rather than the backend's so that it
+            # does not move when the default does.
+            if algorithm in ("sage", "symfn") and i <= 0:
+                raise ValueError(r"cannot apply \delta_{%s} to a (= %s)" % (i, self))
             if algorithm == "sage":
-                if i <= 0:
-                    raise ValueError(r"cannot apply \delta_{%s} to a (= %s)" % (i, self))
                 # The operator `\delta_i` sends the Schubert
                 # polynomial `X_\pi` (where `\pi` is a finitely supported
                 # permutation of `\{1, 2, 3, \ldots\}`) to:
