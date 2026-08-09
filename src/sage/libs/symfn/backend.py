@@ -852,16 +852,18 @@ def character_contract(la, kind, parent):
 
 # --- Schubert polynomials ---------------------------------------------------
 #
-# These four are the sites in :mod:`sage.combinat.schubert_polynomial` that
+# These five are the sites in :mod:`sage.combinat.schubert_polynomial` that
 # reach Symmetrica with no fallback of their own.  ``divided_difference`` is
 # deliberately not here: its default is ``algorithm='sage'``, a pure-Python
 # implementation, and its ``algorithm='symmetrica'`` branch names the backend it
 # wants -- answering that with a different one would make the argument a lie.
 #
-# ``scalar_product`` is not here either, and will not be: it needs
-# ``scalarproduct_schubert``, the one operation symfn does not have, and nothing
-# in sagelib calls it (see the coverage audit).  It stays with the optional
-# Symmetrica package.
+# ``scalar_product`` was once excluded on the grounds that symfn did not have
+# ``scalarproduct_schubert`` and nothing in sagelib called it.  The first half
+# stopped being true; the second is still true and turned out not to settle the
+# question, because the method is public on ``SchubertPolynomial`` rather than a
+# low-level export, so code outside sagelib can reach it without knowing which
+# library answers.
 
 
 def _schub_terms(elt):
@@ -977,6 +979,47 @@ def polynomial_to_schubert(poly, parent):
     """
     terms = [(list(e), int(c)) for e, c in poly.monomial_coefficients().items()]
     return _schub_from(symfn.polynomial_to_schubert(terms), parent)
+
+
+def schubert_scalar_product(left, right):
+    r"""
+    Return the standard scalar product of two Schubert polynomials.
+
+    The value is a Schubert polynomial and not a scalar: it is
+    `\partial_{w_0^{(n)}}(f \cdot g)`, whose coefficient at the identity is the
+    Poincare pairing and whose higher-degree terms the pairing cannot see.
+
+    ``n`` is the rank Symmetrica reads off the lengths of its stored vectors,
+    so its answer moves when the same inputs arrive padded differently.  What
+    reaches this function does not vary that way: Sage strips trailing fixed
+    points, so the longest one-line form in either support is the only reading
+    available, and passing it explicitly is what makes the value reproducible.
+
+    EXAMPLES:
+
+    The two values :meth:`SchubertPolynomial.scalar_product` documents::
+
+        sage: from sage.libs.symfn.backend import schubert_scalar_product
+        sage: X = SchubertPolynomialRing(ZZ)
+        sage: a = X([3, 2, 4, 1])
+        sage: schubert_scalar_product(a, a)
+        0
+        sage: schubert_scalar_product(X([4, 3, 2, 1]), a)
+        X[1, 3, 4, 6, 2, 5]
+
+    The rank is read from both arguments, not from one, and it is what makes
+    a shorter word answer differently against a longer one::
+
+        sage: schubert_scalar_product(X([2, 1]), X([2, 1]))
+        X[1, 3, 2]
+        sage: schubert_scalar_product(X([2, 1]), X([3, 2, 1]))
+        X[1, 2, 4, 3]
+    """
+    rows = _schub_terms(left) + _schub_terms(right)
+    n = max([len(w) for w, _ in rows] + [0])
+    return _schub_from(symfn.schubert_scalar_product(_schub_terms(left),
+                                                     _schub_terms(right), n),
+                       left.parent())
 
 
 def hall_littlewood(part):

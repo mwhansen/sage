@@ -359,6 +359,10 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
              + x0*x1*x3^2 + x0*x2*x3^2 + x1*x2*x3^2
         """
         if isinstance(x, SchubertPolynomial_class):
+            from sage.libs.symfn import is_available
+            if is_available():
+                from sage.libs.symfn.backend import schubert_scalar_product
+                return schubert_scalar_product(self, x)
             return symmetrica.scalarproduct_schubert(self, x)
         raise TypeError("x must be a Schubert polynomial")
 
