@@ -853,10 +853,16 @@ def character_contract(la, kind, parent):
 # --- Schubert polynomials ---------------------------------------------------
 #
 # These five are the sites in :mod:`sage.combinat.schubert_polynomial` that
-# reach Symmetrica with no fallback of their own.  ``divided_difference`` is
-# deliberately not here: its default is ``algorithm='sage'``, a pure-Python
-# implementation, and its ``algorithm='symmetrica'`` branch names the backend it
-# wants -- answering that with a different one would make the argument a lie.
+# reach Symmetrica with no fallback of their own, and they dispatch here
+# whenever symfn is present.
+#
+# ``divided_difference`` is the exception, and it is not silent: its
+# ``algorithm`` argument names the library the caller wants, so answering
+# ``'symmetrica'`` from a different backend would make the argument a lie.
+# The two entry points below are reached by ``algorithm='symfn'`` instead,
+# which asks for them.  That option is more total than the one it sits beside:
+# where Symmetrica's wrapper rejects an operator index past the permutation's
+# length, symfn returns the value, because there is one.
 #
 # ``scalar_product`` was once excluded on the grounds that symfn did not have
 # ``scalarproduct_schubert`` and nothing in sagelib called it.  The first half
@@ -1020,6 +1026,66 @@ def schubert_scalar_product(left, right):
     return _schub_from(symfn.schubert_scalar_product(_schub_terms(left),
                                                      _schub_terms(right), n),
                        left.parent())
+
+
+def schubert_divided_difference(elt, i):
+    r"""
+    Return `\delta_i f`, the divided difference operator on a Schubert
+    polynomial.
+
+    ``i`` is **1-based**, which is Sage's convention for this operator and
+    symfn's; it is ``multiply_variable`` that is 0-based on both sides, not
+    this.
+
+    An ``i`` past the length of a permutation in the support annihilates that
+    term rather than being an error -- Symmetrica's wrapper rejects it, and
+    there is a value.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import schubert_divided_difference
+        sage: X = SchubertPolynomialRing(ZZ)
+        sage: a = X([3, 2, 1])
+        sage: schubert_divided_difference(a, 1)
+        X[2, 3, 1]
+
+    The out-of-range index that ``algorithm='symmetrica'`` raises on::
+
+        sage: schubert_divided_difference(a, 5)
+        0
+    """
+    return _schub_from(symfn.schubert_divided_difference(_schub_terms(elt),
+                                                         int(i)),
+                       elt.parent())
+
+
+def schubert_divided_difference_perm(elt, w):
+    r"""
+    Return `\delta_w f`, the divided difference operator indexed by a
+    permutation.
+
+    `\delta_w` is the composition of `\delta_{i_1} \cdots \delta_{i_k}` over
+    any reduced word for `w`; which one is immaterial, so the value does not
+    depend on how ``w`` was written.
+
+    EXAMPLES::
+
+        sage: from sage.libs.symfn.backend import schubert_divided_difference_perm
+        sage: X = SchubertPolynomialRing(ZZ)
+        sage: b = X([4, 3, 2, 1])
+        sage: schubert_divided_difference_perm(b, Permutation([2, 3, 1]))
+        X[3, 2, 4, 1]
+        sage: schubert_divided_difference_perm(b, Permutation([4, 1, 3, 2]))
+        X[1, 4, 2, 3]
+
+    The identity is the empty composition, and returns its argument::
+
+        sage: schubert_divided_difference_perm(b, Permutation([1, 2]))
+        X[4, 3, 2, 1]
+    """
+    return _schub_from(symfn.schubert_divided_difference_perm(_schub_terms(elt),
+                                                              list(w)),
+                       elt.parent())
 
 
 def hall_littlewood(part):

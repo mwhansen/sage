@@ -179,9 +179,12 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
 
         - ``i`` -- permutation or positive integer
 
-        - ``algorithm`` -- (default: ``'sage'``) either ``'sage'``
-          or ``'symmetrica'``; this determines which software is
-          called for the computation
+        - ``algorithm`` -- (default: ``'sage'``) one of ``'sage'``,
+          ``'symfn'`` or ``'symmetrica'``; this determines which software is
+          called for the computation.  ``'symfn'`` needs the
+          :ref:`symfn <spkg_symfn>` package, and agrees with ``'sage'``
+          everywhere, including on an index past the permutation's length
+          where ``'symmetrica'`` raises instead
 
         OUTPUT:
 
@@ -275,6 +278,22 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
             Traceback (most recent call last):
             ...
             ValueError: cannot apply \delta_{0} to a (= X[3, 2, 4, 1])
+
+        ``'symfn'`` agrees with ``'sage'``, and answers the out-of-range
+        index that ``'symmetrica'`` rejects::
+
+            sage: # optional - symfn
+            sage: b = X([3, 2, 1])
+            sage: b.divided_difference(1, algorithm='symfn')
+            X[2, 3, 1]
+            sage: b.divided_difference([3, 2, 1], algorithm='symfn')
+            X[1]
+            sage: b.divided_difference(5, algorithm='symfn')
+            0
+            sage: b.divided_difference(5, algorithm='symmetrica')
+            Traceback (most recent call last):
+            ...
+            ValueError: cannot apply \delta_{5} to a (= X[3, 2, 1])
         """
         if not self:  # if self is 0
             return self
@@ -304,6 +323,9 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
                     pi = Perms(pi).remove_extra_fixed_points()
                     res_dict[pi] = coeff
                 return self.parent()._from_dict(res_dict)
+            if algorithm == "symfn":
+                from sage.libs.symfn.backend import schubert_divided_difference
+                return schubert_divided_difference(self, i)
             # if algorithm == "symmetrica":
             return symmetrica.divdiff_schubert(i, self)
         if i in Perms:
@@ -328,6 +350,10 @@ class SchubertPolynomial_class(CombinatorialFreeModule.Element):
                     pi = Perms(pi).remove_extra_fixed_points()
                     res_dict[pi] = coeff
                 return self.parent()._from_dict(res_dict)
+            if algorithm == "symfn":
+                from sage.libs.symfn.backend import \
+                    schubert_divided_difference_perm
+                return schubert_divided_difference_perm(self, i)
             # if algorithm == "symmetrica":
             return symmetrica.divdiff_perm_schubert(i, self)
         raise TypeError("i must either be an integer or permutation")
